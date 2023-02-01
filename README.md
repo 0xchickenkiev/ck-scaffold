@@ -1,1 +1,1 @@
-# ck-scaffold
+# Full Stack Eth Scaffold
