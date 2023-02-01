@@ -48,7 +48,7 @@ contract Staker {
       exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
   }
 
-  function stake() public payable deadlineReacher(false) stakeNotCompleted {
+  function stake() public payable deadlineReached(false) stakeNotCompleted {
     balances[msg.sender] += msg.value;
 
     emit Stake(msg.sender, msg.value);  
@@ -90,5 +90,7 @@ contract Staker {
   }
 
   // Add the `receive()` special function that receives eth and calls stake()
-
+  receive() external payable {
+    stake();
+  }
 }
