@@ -8,39 +8,16 @@ contract Staker {
 
   ExampleExternalContract public exampleExternalContract;
 
-  //Balance of users staked funds
-  mapping (address => uint) public balances;
-
-  //Staking threshold
-  uint256 public constant threshold = 1 ether;
-
-  //Contract events
   event Stake(address indexed sender, uint256 amount);
 
-  //Setting a deadline
-  uint256 public deadline = block.timestamp + 30 seconds;
+  mapping (address => uint) public balances;
 
-    // Contract's Modifiers
-  /**
-  * @notice Modifier that require the deadline to be reached or not
-  * @param requireReached Check if the deadline has reached or not
-  */
-  modifier deadlineReached( bool requireReached ) {
-    uint256 timeRemaining = timeLeft();
-    if( requireReached ) {
-      require(timeRemaining == 0, "Deadline is not reached yet");
-    } else {
-      require(timeRemaining > 0, "Deadline is already reached");
-    }
-    _;
-  }
+  uint256 public constant threshold = 1 ether;
+  uint256 public deadline = block.timestamp + 50 seconds;
+  bool public openForWithDraw;
 
-  /**
-  * @notice Modifier that require the external contract to not be completed
-  */
-  modifier stakeNotCompleted() {
-    bool completed = exampleExternalContract.completed();
-    require(!completed, "staking process already completed");
+   modifier notCompleted() {
+    require(exampleExternalContract.completed() == false, "Staking Completed");
     _;
   }
 
@@ -48,35 +25,29 @@ contract Staker {
       exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
   }
 
-  function stake() public payable deadlineReached(false) stakeNotCompleted {
+  function stake() public payable {
+    require(block.timestamp < deadline, "Cannot stake anymore");
+    require(address(this).balance <= threshold, "Cannot stake anymore, threshold reached");
     balances[msg.sender] += msg.value;
-
     emit Stake(msg.sender, msg.value);  
     }
 
-  function execute() public stakeNotCompleted deadlineReached(false) {
-    uint256 contractBalance = address(this).balance;
-
-    // check the contract has enough ETH to reach the treshold
-    require(contractBalance >= threshold, "Threshold not reached");
-
-    // Execute the external contract, transfer all the balance to the contract
-    // (bool sent, bytes memory data) = exampleExternalContract.complete{value: contractBalance}();
-    (bool sent,) = address(exampleExternalContract).call{value: contractBalance}(abi.encodeWithSignature("complete()"));
-    require(sent, "exampleExternalContract.complete failed");
+  function execute() external notCompleted {
+    require(block.timestamp > deadline, "Deadline not reached yet");
+    if(address(this).balance >= threshold) {
+      exampleExternalContract.complete{value: address(this).balance}();
+      openForWithDraw = false;
+    } else {
+      openForWithDraw = true;
+    }
   }
 
   // If the `threshold` was not met, allow everyone to call a `withdraw()` function to withdraw their balance
-  function withdraw() public deadlineReached(true) stakeNotCompleted {
-    //Get the balance of the function caller
-    uint userBalance = balances[msg.sender];
-    //Check that they have a balance greater than 0
-    require(userBalance > 0, "You don't have balance to withdraw");
-    //reset the balance of the caller
-    balances[msg.sender] = 0;
-    //Transfer balance back to user
-    (bool sent,) = msg.sender.call{value: userBalance}("");
-    require(sent, "Failed to send user balance back to the user");
+  function withdraw() external payable notCompleted {
+    require(balances[msg.sender] > 0, "Nothing to withdraw");
+    require(openForWithDraw == true, "Cannot withdraw");
+    payable(msg.sender).transfer(balances[msg.sender]);
+    balances[msg.sender] = 0;   
   }
 
 
