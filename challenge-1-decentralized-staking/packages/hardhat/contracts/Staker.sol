@@ -13,7 +13,7 @@ contract Staker {
   mapping (address => uint) public balances;
 
   uint256 public constant threshold = 1 ether;
-  uint256 public deadline = block.timestamp + 50 seconds;
+  uint256 public deadline = block.timestamp + 72 hours;
   bool public openForWithDraw;
 
    modifier notCompleted() {
@@ -27,7 +27,6 @@ contract Staker {
 
   function stake() public payable {
     require(block.timestamp < deadline, "Cannot stake anymore");
-    require(address(this).balance <= threshold, "Cannot stake anymore, threshold reached");
     balances[msg.sender] += msg.value;
     emit Stake(msg.sender, msg.value);  
     }
@@ -49,7 +48,6 @@ contract Staker {
     payable(msg.sender).transfer(balances[msg.sender]);
     balances[msg.sender] = 0;   
   }
-
 
   // Add a `timeLeft()` view function that returns the time left before the deadline for the frontend
   function timeLeft() public view returns(uint256) {
