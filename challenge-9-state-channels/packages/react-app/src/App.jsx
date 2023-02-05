@@ -475,6 +475,17 @@ function App(props) {
        *  and then use ethers.utils.verifyMessage() to confirm that voucher signer was
        *  `clientAddress`. (If it wasn't, log some error message and return).
       */
+      const packed = ethers.utils.solidityPack(["uint256"], [updatedBalance])
+      const hashed = ethers.utils.keccak256(packed)
+      const arrayify = ethers.utils.arrayify(hashed)
+
+      const voucherSigner = ethers.utils.verifyMessage(arrayify, voucher.data.signature)
+
+      if(voucherSigner != clientAddress) {
+
+        console.log("voucher signer is not the clientAddress!")
+        return
+      }
 
       const existingVoucher = vouchers()[clientAddress];
 
