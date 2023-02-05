@@ -4,6 +4,9 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
+error Streamer__Transfer_failed();
+error Streamer__Signer_is_not_running_the_channel();
+
 contract Streamer is Ownable {
     event Opened(address, uint256);
     event Challenged(address);
@@ -25,50 +28,35 @@ contract Streamer is Ownable {
     }
 
     function withdrawEarnings(Voucher calldata voucher) public onlyOwner {
-        // like the off-chain code, signatures are applied to the hash of the data
-        // instead of the raw data itself
         bytes32 hashed = keccak256(abi.encode(voucher.updatedBalance));
-
         bytes memory prefixed = abi.encodePacked(
             "\x19Ethereum Signed Message:\n32",
             hashed
         );
         bytes32 prefixedHashed = keccak256(prefixed);
-
         address signer = ecrecover(prefixedHashed, voucher.sig.v, voucher.sig.r, voucher.sig.s);
-        require(balances[signer] >= voucher.updatedBalance, "No channel detected");
+        if(balances[signer] <= voucher.updatedBalance) revert Streamer__Signer_is_not_running_the_channel();
         uint256 payment = balances[signer] - voucher.updatedBalance;
         balances[signer] -= payment;
         address owner = owner();
         (bool success, ) = owner.call{value: payment}("");
-        require(success, "Failed to pay owner");
+        if(!success) revert Streamer__Transfer_failed();
         emit Withdrawn(owner, payment);
     }
 
-    /*
-    Checkpoint 6a: Challenge the channel
-
-    create a public challengeChannel() function that:
-    - checks that msg.sender has an open channel
-    - updates canCloseAt[msg.sender] to some future time
-    - emits a Challenged event
-    */
-
     function challengeChannel() public {
-        require(msg.sender[balances] != 0, "No channel for this user is active");
+        require(balances[msg.sender] != 0, "No channel for this user is active");
         canCloseAt[msg.sender] = block.timestamp + 30 seconds;
         emit Challenged(msg.sender);
     }
 
-    /*
-    Checkpoint 6b: Close the channel
-
-    create a public defundChannel() function that:
-    - checks that msg.sender has a closing channel
-    - checks that the current time is later than the closing time
-    - sends the channel's remaining funds to msg.sender, and sets the balance to 0
-    - emits the Closed event
-    */
+    function defundChannel() public {
+        require(canCloseAt[msg.sender] != 0, "Unable to close channel");
+        require(canCloseAt[msg.sender] < block.timestamp, "Closing time not reached");
+        (bool success, ) = msg.sender.call{value: balances[msg.sender]}("");
+        require(success, "Balance not sent!");
+        emit Closed(msg.sender);
+    }
 
     struct Voucher {
         uint256 updatedBalance;

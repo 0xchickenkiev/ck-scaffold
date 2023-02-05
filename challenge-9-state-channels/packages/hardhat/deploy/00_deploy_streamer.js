@@ -16,7 +16,7 @@ module.exports = async ({ getNamedAccounts, deployments, getChainId }) => {
 
   console.log("\n 🤹  Sending ownership to frontend address...\n");
   //Checkpoint 2: change address to your frontend address vvvv
-  const ownerTx = await streamer.transferOwnership("0xd05472bd4bCbeE140A5806cb2df2B05147C8BEe9");
+  const ownerTx = await streamer.transferOwnership("0x57856C7B13344cb7D03A4378a444CF581cF8f701");
 
    console.log("\n       confirming...\n");
    const ownershipResult = await ownerTx.wait();
