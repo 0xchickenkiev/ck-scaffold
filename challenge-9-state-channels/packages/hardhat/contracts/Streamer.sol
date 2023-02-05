@@ -29,31 +29,20 @@ contract Streamer is Ownable {
         // instead of the raw data itself
         bytes32 hashed = keccak256(abi.encode(voucher.updatedBalance));
 
-        // The prefix string here is part of a convention used in ethereum for signing
-        // and verification of off-chain messages. The trailing 32 refers to the 32 byte
-        // length of the attached hash message.
-        //
-        // There are seemingly extra steps here compared to what was done in the off-chain
-        // `reimburseService` and `processVoucher`. Note that those ethers signing and verification
-        // functions do the same under the hood.
-        //
-        // again, see https://blog.ricmoo.com/verifying-messages-in-solidity-50a94f82b2ca
         bytes memory prefixed = abi.encodePacked(
             "\x19Ethereum Signed Message:\n32",
             hashed
         );
         bytes32 prefixedHashed = keccak256(prefixed);
 
-        /*
-        Checkpoint 5: Recover earnings
-
-        The service provider would like to cash out their hard earned ether.
-            - use ecrecover on prefixedHashed and the supplied signature
-            - require that the recovered signer has a running channel with balances[signer] > v.updatedBalance
-            - calculate the payment when reducing balances[signer] to v.updatedBalance
-            - adjust the channel balance, and pay the contract owner. (Get the owner address withthe `owner()` function)
-            - emit the Withdrawn event
-        */
+        address signer = exrecover(prefixedHashed, voucher.sig.v, voucher.sig.r, voucher.sig.s);
+        require(balances[signer] >= voucher.updatedBalance, "No channel detected");
+        uint256 payment = balances[signer] - voucher.updatedBalance;
+        balances[signer] -= payment;
+        address owner = owner();
+        (bool success, ) = owner.call{value: payment}("");
+        require(sent, "Failed to pay owner");
+        emit Withdrawn(owner, payment);
     }
 
     /*
